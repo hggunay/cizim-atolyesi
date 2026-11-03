@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Çizim Atölyesi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  /* Düzen: üstte araç şeritleri, altta tam genişlikte kareli kâğıt. Büyük dokunma hedefleri, tek el. */
+  :root{
+    --bg:#ece7dc; --panel:#f7f3ea; --cizgi:#c9c0ae; --fg:#2a2620; --soluk:#6f675a; --vurgu:#b0741c; --vurgu-zemin:#f3e2c4;
+    --font:"IBM Plex Mono","Courier New",monospace;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --bg:#1d1c1a; --panel:#2a2926; --cizgi:#4a463f; --fg:#e8e4d8; --soluk:#a39c8e; --vurgu:#d4a72c; --vurgu-zemin:#3a3420; color-scheme:dark; } }
+  :root[data-theme="dark"]{ --bg:#1d1c1a; --panel:#2a2926; --cizgi:#4a463f; --fg:#e8e4d8; --soluk:#a39c8e; --vurgu:#d4a72c; --vurgu-zemin:#3a3420; color-scheme:dark; }
+  body{background:var(--bg);color:var(--fg);font-family:var(--font);
+    padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:12px;}
+  .kap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:10px;}
+  .satir{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .baslik{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--soluk);width:100%;}
+  button,label.dugme{font:inherit;font-size:16px;min-width:48px;min-height:48px;padding:6px 12px;border-radius:8px;
+    border:2px solid var(--cizgi);background:var(--panel);color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;}
+  button:focus-visible,label.dugme:focus-visible{outline:3px solid var(--vurgu);outline-offset:2px;}
+  button.secili{border-color:var(--vurgu);background:var(--vurgu-zemin);}
+  .sekme{font-size:18px;font-weight:600;}
+  .karakter{font-size:20px;font-weight:600;width:50px;justify-content:center;}
+  .renk{width:40px;height:40px;min-width:40px;min-height:40px;padding:0;border-radius:6px;}
+  .renk.secili{outline:3px solid var(--vurgu);outline-offset:2px;}
+  input[type=color]{width:48px;height:48px;border:none;background:none;padding:0;cursor:pointer;}
+  input[type=file]{display:none;}
+  .onay{background:var(--vurgu-zemin);border:2px solid var(--vurgu);border-radius:8px;padding:8px 12px;}
+  canvas{width:100%;max-width:100%;height:auto;display:block;border-radius:6px;touch-action:none;cursor:crosshair;image-rendering:pixelated;border:1px solid var(--cizgi);}
+  .not{font-size:13px;color:var(--soluk);}
+  .kayit{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:20;
+    padding:max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));}
+  .kayit-ic{background:var(--panel);color:var(--fg);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:min(720px,100%);max-height:100%;overflow:auto;}
+  .kayit-ic img{max-width:100%;height:auto;border-radius:6px;-webkit-touch-callout:default;}
+  [hidden]{display:none!important}
+  body{margin:0}
+</style>
+</head>
+<body>
+
+
+<div class="kap">
+  <div class="satir">
+    <button class="sekme secili" data-mod="ascii">🔤 ASCII</button>
+    <button class="sekme" data-mod="piksel">🟧 Piksel</button>
+    <span style="flex:1"></span>
+    <button id="zeminDugme">🌙 Koyu kâğıt</button>
+  </div>
+
+  <div class="satir">
+    <div class="baslik">Araç</div>
+    <button class="arac secili" data-arac="kalem">✏️ Kalem</button>
+    <button class="arac" data-arac="silgi">🧽 Silgi</button>
+    <button class="arac" data-arac="kova">🪣 Doldur</button>
+    <button id="geri">↩️ Geri al</button>
+    <button id="temizle">🗑️ Temizle</button>
+    <label class="dugme" for="dosya">🖼️ Resimden çevir</label><input type="file" id="dosya" accept="image/*">
+    <button id="kaydet">💾 Kaydet</button>
+  </div>
+
+  <div class="satir onay" id="onay" hidden></div>
+
+  <div class="satir" id="karakterSatiri">
+    <div class="baslik">Karakter (klavye varsa bir tuşa basarak da seçilir)</div>
+  </div>
+
+  <div class="satir">
+    <div class="baslik">Kalem kalınlığı</div>
+    <button class="firca secili" data-f="1">• İnce</button>
+    <button class="firca" data-f="2">● Orta</button>
+    <button class="firca" data-f="3">⬤ Kalın</button>
+    <button id="altKatman" hidden>🟧 Piksel çizimini alta koy</button>
+  </div>
+
+  <div class="satir">
+    <div class="baslik">Kâğıt: kare boyutu (iri kareye geçince ayrıntı kaybolur, Geri al ile döner)</div>
+    <button class="boyut" data-b="0">🟫 İri kareler</button>
+    <button class="boyut" data-b="1">🟧 Orta kareler</button>
+    <button class="boyut" data-b="2">🔸 İnce kareler</button>
+  </div>
+
+  <div class="satir" id="renkSatiri">
+    <div class="baslik">Renk</div>
+  </div>
+
+  <canvas id="c"></canvas>
+  <div class="not" id="bilgi"></div>
+</div>
+
+<div class="kayit" id="kayit" hidden>
+  <div class="kayit-ic">
+    <strong>Resmin hazır</strong>
+    <span class="not">Resmin üstüne basılı tut, "Resmi kaydet"i seç. Bilgisayarda sağ tıklayıp "Resmi farklı kaydet".</span>
+    <img id="kayitResim" alt="Çizimin">
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a id="kayitIndir" class="dugme" download="cizim.png" style="text-decoration:none;font:inherit;font-size:16px;min-height:48px;padding:6px 12px;border-radius:8px;border:2px solid var(--vurgu);background:var(--vurgu-zemin);color:var(--fg);display:inline-flex;align-items:center">⬇️ İndir</a><button id="kayitKapat">Kapat</button></div>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const AC={sut:80,sat:40,gen:12,yuk:20}, PK={sut:64,sat:64,gen:12};
+const PK_BOY=[32,64,128], AC_BOY=[[48,24],[80,40],[160,80]];
+function boyutlariAyarla(){
+  PK.sut=PK.sat=piksel.length; PK.gen=Math.max(6,Math.floor(1024/PK.sut));
+  AC.sat=ascii.length; AC.sut=ascii[0].length; AC.gen=Math.floor(960/AC.sut); AC.yuk=Math.round(AC.gen*5/3);
+  const i=mod==='ascii'?AC_BOY.findIndex(b=>b[0]===AC.sut):PK_BOY.indexOf(PK.sut);
+  document.querySelectorAll('.boyut').forEach(d=>d.classList.toggle('secili',+d.dataset.b===i));
+}
+const pkAyarla=boyutlariAyarla;
+const KARAKTERLER=['#','@','%','*','+','=','-',':','.','|','/','\\','_','~','o','O','░','▒','▓','█','▀','▄','■','♥','★','☾'];
+const RENKLER=['#1c1b19','#5a5650','#a8a29a','#e8e4d8','#ffffff','#b3262e','#e74c3c','#f39c12','#d4a72c','#f1c40f','#2e7d32','#2ecc71','#2b6cb0','#4fc3f7','#8a4b8f','#e6b08c','#7a5c3a','#d9822b'];
+let mod='ascii', arac='kalem', karakter='#', renk='#1c1b19', koyu=false, kalemVar=false, firca=1, alta=false;
+let ascii=bos('ascii'), piksel=bos('piksel'), gecmis=[];
+
+function bos(m){
+  if(m==='ascii') return Array.from({length:AC.sat},()=>Array.from({length:AC.sut},()=>null));
+  return Array.from({length:PK.sat},()=>Array.from({length:PK.sut},()=>null));
+}
+const veri=()=>mod==='ascii'?ascii:piksel;
+
+function sakla(){ try{ localStorage.setItem('cizim-atolyesi',JSON.stringify({ascii,piksel,koyu,alta})); }catch(e){} }
+try{ const k=JSON.parse(localStorage.getItem('cizim-atolyesi')||'null');
+  if(k&&k.ascii&&k.piksel){ascii=k.ascii;piksel=k.piksel;koyu=!!k.koyu;alta=!!k.alta;} }catch(e){}
+
+function pikselAlta(c,W,H){
+  const n=piksel.length, b=Math.min(W,H)/n, ox=(W-b*n)/2, oy=(H-b*n)/2;
+  for(let r=0;r<n;r++) for(let s=0;s<n;s++){const h=piksel[r][s]; if(h){c.fillStyle=h;c.fillRect(ox+s*b,oy+r*b,Math.ceil(b),Math.ceil(b));}}
+}
+function ciz(){
+  const z=koyu?'#1d1c1a':'#e8e4d8', izgara=koyu?'rgba(255,255,255,.05)':'rgba(0,0,0,.06)';
+  if(mod==='ascii'){
+    cv.width=AC.sut*AC.gen; cv.height=AC.sat*AC.yuk;
+    ctx.fillStyle=z; ctx.fillRect(0,0,cv.width,cv.height);
+    if(alta) pikselAlta(ctx,cv.width,cv.height);
+    ctx.strokeStyle=izgara; ctx.lineWidth=1;
+    for(let c=0;c<=AC.sut;c++){ctx.beginPath();ctx.moveTo(c*AC.gen+.5,0);ctx.lineTo(c*AC.gen+.5,cv.height);ctx.stroke();}
+    for(let r=0;r<=AC.sat;r++){ctx.beginPath();ctx.moveTo(0,r*AC.yuk+.5);ctx.lineTo(cv.width,r*AC.yuk+.5);ctx.stroke();}
+    ctx.font='bold '+Math.round(AC.yuk*0.9)+'px "Courier New",monospace'; ctx.textBaseline='middle'; ctx.textAlign='center';
+    for(let r=0;r<AC.sat;r++) for(let c=0;c<AC.sut;c++){const h=ascii[r][c]; if(h){ctx.fillStyle=h[1]; ctx.fillText(h[0],c*AC.gen+AC.gen/2,r*AC.yuk+AC.yuk/2+1);}}
+  } else {
+    cv.width=PK.sut*PK.gen; cv.height=PK.sat*PK.gen;
+    ctx.fillStyle=z; ctx.fillRect(0,0,cv.width,cv.height);
+    for(let r=0;r<PK.sat;r++) for(let c=0;c<PK.sut;c++){const h=piksel[r][c]; if(h){ctx.fillStyle=h;ctx.fillRect(c*PK.gen,r*PK.gen,PK.gen,PK.gen);}}
+    ctx.strokeStyle=izgara; ctx.lineWidth=1;
+    for(let c=0;c<=PK.sut;c++){ctx.beginPath();ctx.moveTo(c*PK.gen+.5,0);ctx.lineTo(c*PK.gen+.5,cv.height);ctx.stroke();}
+    for(let r=0;r<=PK.sat;r++){ctx.beginPath();ctx.moveTo(0,r*PK.gen+.5);ctx.lineTo(cv.width,r*PK.gen+.5);ctx.stroke();}
+  }
+  document.getElementById('bilgi').textContent=(mod==='ascii'
+    ?'ASCII: '+AC.sut+'×'+AC.sat+' kare · seçili: "'+karakter+'"'
+    :'Piksel: '+PK.sut+'×'+PK.sat+' kare')+(kalemVar?' · ✍️ kalem modu: parmak dokunuşları yok sayılıyor':'');
+}
+
+function hucre(e){
+  const b=cv.getBoundingClientRect(), x=(e.clientX-b.left)*cv.width/b.width, y=(e.clientY-b.top)*cv.height/b.height;
+  return mod==='ascii'?[Math.floor(y/AC.yuk),Math.floor(x/AC.gen)]:[Math.floor(y/PK.gen),Math.floor(x/PK.gen)];
+}
+function deger(){ return arac==='silgi'?null:(mod==='ascii'?[karakter,renk]:renk); }
+const ayni=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function koy(r,c){ const v=veri(), d=deger(), a=Math.floor((firca-1)/2);
+  for(let y=r-a;y<r-a+firca;y++) for(let x=c-a;x<c-a+firca;x++) if(y>=0&&x>=0&&y<v.length&&x<v[0].length) v[y][x]=d; }
+function doldur(r,c){
+  const v=veri(); if(r<0||c<0||r>=v.length||c>=v[0].length) return;
+  const eski=v[r][c], yeni=deger(); if(ayni(eski,yeni)) return;
+  const yigin=[[r,c]];
+  while(yigin.length){ const [y,x]=yigin.pop();
+    if(y<0||x<0||y>=v.length||x>=v[0].length||!ayni(v[y][x],eski)) continue;
+    v[y][x]=yeni; yigin.push([y+1,x],[y-1,x],[y,x+1],[y,x-1]); }
+}
+function anlik(){ gecmis.push(JSON.stringify({ascii,piksel})); if(gecmis.length>60) gecmis.shift(); }
+
+// Kalem bir kez görülünce parmak/avuç dokunuşları çizmez
+function gecerli(e){ if(e.pointerType==='pen'){ if(!kalemVar){kalemVar=true;ciz();} return true; } return !(kalemVar&&e.pointerType==='touch'); }
+
+let basili=false, son=null;
+cv.addEventListener('pointerdown',e=>{
+  if(!gecerli(e)) return;
+  cv.setPointerCapture(e.pointerId); anlik();
+  const [r,c]=hucre(e);
+  if(arac==='kova'){ doldur(r,c); ciz(); sakla(); return; }
+  basili=true; son=[r,c]; koy(r,c); ciz();
+});
+cv.addEventListener('pointermove',e=>{
+  if(!basili||!gecerli(e)) return;
+  const [r,c]=hucre(e);
+  const adim=Math.max(Math.abs(r-son[0]),Math.abs(c-son[1]),1);
+  for(let i=1;i<=adim;i++) koy(Math.round(son[0]+(r-son[0])*i/adim),Math.round(son[1]+(c-son[1])*i/adim));
+  son=[r,c]; ciz();
+});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>{ if(basili){basili=false;sakla();} }));
+
+const kSat=document.getElementById('karakterSatiri');
+KARAKTERLER.forEach(k=>{const d=document.createElement('button');d.className='karakter'+(k===karakter?' secili':'');d.textContent=k;
+  d.onclick=()=>karakterSec(k); kSat.appendChild(d);});
+function karakterSec(k){ karakter=k; document.querySelectorAll('.karakter').forEach(d=>d.classList.toggle('secili',d.textContent===k)); if(arac==='silgi') aracSec('kalem'); ciz(); }
+document.addEventListener('keydown',e=>{
+  if(mod!=='ascii'||e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.key.length===1&&e.key!==' '){ karakterSec(e.key); e.preventDefault(); }
+});
+
+const rSat=document.getElementById('renkSatiri');
+RENKLER.forEach(k=>{const d=document.createElement('button');d.className='renk'+(k===renk?' secili':'');d.style.background=k;d.title=k;d.setAttribute('aria-label','Renk '+k);
+  d.onclick=()=>renkSec(k); rSat.appendChild(d);});
+const ozel=document.createElement('input'); ozel.type='color'; ozel.id='ozelRenk'; ozel.title='Başka renk'; ozel.oninput=()=>renkSec(ozel.value); rSat.appendChild(ozel);
+function renkSec(k){ renk=k; document.querySelectorAll('.renk').forEach(d=>d.classList.toggle('secili',d.title===k)); if(arac==='silgi') aracSec('kalem'); }
+
+function aracSec(a){ arac=a; document.querySelectorAll('.arac').forEach(d=>d.classList.toggle('secili',d.dataset.arac===a)); }
+document.querySelectorAll('.arac').forEach(d=>d.onclick=()=>aracSec(d.dataset.arac));
+
+document.querySelectorAll('.sekme').forEach(d=>d.onclick=()=>{
+  mod=d.dataset.mod; document.querySelectorAll('.sekme').forEach(x=>x.classList.toggle('secili',x===d));
+  kSat.hidden=mod!=='ascii'; document.getElementById('altKatman').hidden=mod!=='ascii'; boyutlariAyarla(); ciz();
+});
+
+document.getElementById('geri').onclick=()=>{ if(!gecmis.length) return; const g=JSON.parse(gecmis.pop()); ascii=g.ascii; piksel=g.piksel; boyutlariAyarla(); ciz(); sakla(); };
+
+document.getElementById('temizle').onclick=()=>{
+  const o=document.getElementById('onay');
+  o.innerHTML='<span>Bu çizim tamamen silinsin mi? (Geri al ile geri gelir)</span> <button id="evet">Evet, temizle</button> <button id="hayir">Vazgeç</button>';
+  o.hidden=false;
+  document.getElementById('evet').onclick=()=>{ anlik(); if(mod==='ascii') ascii=bos('ascii'); else piksel=bos('piksel'); o.hidden=true; ciz(); sakla(); };
+  document.getElementById('hayir').onclick=()=>{ o.hidden=true; };
+};
+
+document.getElementById('zeminDugme').onclick=function(){ koyu=!koyu; this.textContent=koyu?'☀️ Açık kâğıt':'🌙 Koyu kâğıt'; ciz(); sakla(); };
+
+document.getElementById('dosya').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const img=new Image();
+  img.onload=()=>{
+    anlik();
+    const [sut,sat]=mod==='ascii'?[AC.sut,AC.sat]:[PK.sut,PK.sat];
+    const hucreOran=mod==='ascii'?AC.yuk/AC.gen:1;
+    const olcek=Math.min(sut/img.width, sat*hucreOran/img.height);
+    const w=Math.max(1,Math.round(img.width*olcek)), h=Math.max(1,Math.round(img.height*olcek/hucreOran));
+    const k=document.createElement('canvas'); k.width=w; k.height=h; const kc=k.getContext('2d');
+    kc.drawImage(img,0,0,w,h); const d=kc.getImageData(0,0,w,h).data;
+    const ox=Math.floor((sut-w)/2), oy=Math.floor((sat-h)/2);
+    const yeni=bos(mod), dizi=' .:-=+*#%@';
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=(y*w+x)*4; if(d[i+3]<40) continue;
+      const hex='#'+[d[i],d[i+1],d[i+2]].map(v=>v.toString(16).padStart(2,'0')).join('');
+      if(mod==='ascii'){
+        const isik=(0.3*d[i]+0.59*d[i+1]+0.11*d[i+2])/255;
+        const ch=(koyu?dizi:dizi.split('').reverse().join(''))[Math.min(9,Math.floor(isik*10))];
+        if(ch!==' ') yeni[oy+y][ox+x]=[ch,hex];
+      } else yeni[oy+y][ox+x]=hex;
+    }
+    if(mod==='ascii') ascii=yeni; else piksel=yeni;
+    ciz(); sakla(); e.target.value='';
+  };
+  img.src=URL.createObjectURL(f);
+};
+
+// Kaydet: ızgarasız resmi ekranda gösterir; basılı tutup kaydedilir
+document.getElementById('kaydet').onclick=()=>{
+  const z=koyu?'#1d1c1a':'#e8e4d8', k=document.createElement('canvas'), c=k.getContext('2d');
+  if(mod==='ascii'){
+    k.width=AC.sut*AC.gen*2; k.height=AC.sat*AC.yuk*2; c.scale(2,2);
+    c.fillStyle=z; c.fillRect(0,0,k.width,k.height);
+    if(alta) pikselAlta(c,AC.sut*AC.gen,AC.sat*AC.yuk);
+    c.font='bold '+Math.round(AC.yuk*0.9)+'px "Courier New",monospace'; c.textBaseline='middle'; c.textAlign='center';
+    for(let r=0;r<AC.sat;r++) for(let s=0;s<AC.sut;s++){const h=ascii[r][s]; if(h){c.fillStyle=h[1]; c.fillText(h[0],s*AC.gen+AC.gen/2,r*AC.yuk+AC.yuk/2+1);}}
+  } else {
+    const b=Math.max(8,Math.round(1024/PK.sut)); k.width=PK.sut*b; k.height=PK.sat*b;
+    c.fillStyle=z; c.fillRect(0,0,k.width,k.height);
+    for(let r=0;r<PK.sat;r++) for(let s=0;s<PK.sut;s++){const h=piksel[r][s]; if(h){c.fillStyle=h;c.fillRect(s*b,r*b,b,b);}}
+  }
+  const url=k.toDataURL('image/png'); document.getElementById('kayitResim').src=url;
+  const ind=document.getElementById('kayitIndir'); if(ind){ ind.href=url; ind.download=(mod==='ascii'?'ascii':'piksel')+'-cizim.png'; }
+  document.getElementById('kayit').hidden=false;
+};
+document.getElementById('kayitKapat').onclick=()=>{ document.getElementById('kayit').hidden=true; };
+
+const olcekle=(v,sat,sut)=>Array.from({length:sat},(_,r)=>Array.from({length:sut},(_,c)=>v[Math.floor(r*v.length/sat)][Math.floor(c*v[0].length/sut)]));
+document.querySelectorAll('.boyut').forEach(d=>d.onclick=()=>{
+  const i=+d.dataset.b;
+  if(mod==='piksel'){ const n=PK_BOY[i]; if(n===piksel.length) return; anlik(); piksel=olcekle(piksel,n,n); }
+  else { const [sut,sat]=AC_BOY[i]; if(sut===ascii[0].length) return; anlik(); ascii=olcekle(ascii,sat,sut); }
+  boyutlariAyarla(); ciz(); sakla();
+});
+document.querySelectorAll('.firca').forEach(d=>d.onclick=()=>{ firca=+d.dataset.f; document.querySelectorAll('.firca').forEach(x=>x.classList.toggle('secili',x===d)); });
+const altD=document.getElementById('altKatman');
+function altYaz(){ altD.textContent=alta?'🟧 Piksel çizimini kaldır':'🟧 Piksel çizimini alta koy'; altD.classList.toggle('secili',alta); }
+altD.onclick=()=>{ alta=!alta; altYaz(); ciz(); sakla(); };
+altD.hidden=mod!=='ascii'; altYaz();
+pkAyarla();
+if(koyu) document.getElementById('zeminDugme').textContent='☀️ Açık kâğıt';
+ciz();
+</script>
+
+</body>
+</html>
